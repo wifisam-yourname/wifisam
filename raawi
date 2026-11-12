@@ -1,0 +1,38 @@
+name: Build APK
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: unzip -q raawi-apk.zip -d proj
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install
+        working-directory: proj
+      - run: npx cap add android
+        working-directory: proj
+      - run: npx capacitor-assets generate --android --iconBackgroundColor '#2e7d32' --iconBackgroundColorDark '#2e7d32'
+        working-directory: proj
+        continue-on-error: true
+      - run: npx cap sync android
+        working-directory: proj
+      - run: chmod +x gradlew && ./gradlew assembleDebug
+        working-directory: proj/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raawi-pro-apk
+          path: proj/android/app/build/outputs/apk/debug/app-debug.apk
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp proj/android/app/build/outputs/apk/debug/app-debug.apk raawi-pro.apk
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest raawi-pro.apk --title "Raawi Pro" --notes "raawi-pro.apk"
